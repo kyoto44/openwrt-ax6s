@@ -12,3 +12,8 @@
 
 # Modify default IP
 #sed -i 's/192.168.1.1/192.168.50.5/g' package/base-files/files/bin/config_generate
+
+cd package
+git clone https://github.com/jerrykuku/luci-theme-argon.git
+git clone https://github.com/gSpotx2f/ruantiblock_openwrt.git
+cd -
