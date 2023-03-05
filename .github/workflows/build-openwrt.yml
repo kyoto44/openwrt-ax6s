@@ -38,7 +38,9 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout
@@ -50,7 +52,7 @@ jobs:
         run: |
           sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
           sudo -E apt-get -qq update
-          sudo -E apt-get -qq install $(curl -fsSL git.io/depends-ubuntu-2004)
+          sudo -E apt-get -qq install build-essential clang flex g++ gawk gcc-multilib gettext git libncurses5-dev libssl-dev python3-distutils rsync unzip zlib1g-dev file wget
           sudo -E apt-get -qq autoremove --purge
           sudo -E apt-get -qq clean
           sudo timedatectl set-timezone "$TZ"
@@ -107,7 +109,7 @@ jobs:
           cd openwrt
           echo -e "$(nproc) thread compile"
           make -j$(nproc) || make -j1 || make -j1 V=s
-          echo "::set-output name=status::success"
+          echo "status=success" >> $GITHUB_OUTPUT
           grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
           [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV
           echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
@@ -130,7 +132,7 @@ jobs:
           cd openwrt/bin/targets/*/*
           rm -rf packages
           echo "FIRMWARE=$PWD" >> $GITHUB_ENV
-          echo "::set-output name=status::success"
+          echo "status=success" >> $GITHUB_OUTPUT
 
       - name: Upload firmware directory
         uses: actions/upload-artifact@main
@@ -146,7 +148,7 @@ jobs:
           curl -fsSL git.io/file-transfer | sh
           ./transfer cow --block 2621440 -s -p 64 --no-progress ${FIRMWARE} 2>&1 | tee cowtransfer.log
           echo "::warning file=cowtransfer.com::$(cat cowtransfer.log | grep https)"
-          echo "::set-output name=url::$(cat cowtransfer.log | grep https | cut -f3 -d" ")"
+          echo "url=$(cat cowtransfer.log | grep https | cut -f3 -d" ")" >> $GITHUB_OUTPUT
 
       - name: Upload firmware to WeTransfer
         id: wetransfer
@@ -155,17 +157,17 @@ jobs:
           curl -fsSL git.io/file-transfer | sh
           ./transfer wet -s -p 16 --no-progress ${FIRMWARE} 2>&1 | tee wetransfer.log
           echo "::warning file=wetransfer.com::$(cat wetransfer.log | grep https)"
-          echo "::set-output name=url::$(cat wetransfer.log | grep https | cut -f3 -d" ")"
+          echo "url=$(cat wetransfer.log | grep https | cut -f3 -d" ")" >> $GITHUB_OUTPUT
 
       - name: Generate release tag
         id: tag
         if: env.UPLOAD_RELEASE == 'true' && !cancelled()
         run: |
-          echo "::set-output name=release_tag::$(date +"%Y.%m.%d-%H%M")"
+          echo "release_tag=$(date +"%Y.%m.%d-%H%M")" >> $GITHUB_OUTPUT
           touch release.txt
           [ $UPLOAD_COWTRANSFER = true ] && echo "🔗 [Cowtransfer](${{ steps.cowtransfer.outputs.url }})" >> release.txt
           [ $UPLOAD_WETRANSFER = true ] && echo "🔗 [WeTransfer](${{ steps.wetransfer.outputs.url }})" >> release.txt
-          echo "::set-output name=status::success"
+          echo "status=success" >> $GITHUB_OUTPUT
 
       - name: Upload firmware to release
         uses: softprops/action-gh-release@v1
